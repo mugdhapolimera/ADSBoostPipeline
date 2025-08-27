@@ -97,22 +97,22 @@ class ADSBoostCelery(ADSCelery):
         """
         try:
             parsed = request.copy()
-                    logger.debug(f"Parsing request with keys: {list(parsed.keys())}")
-        
-        # Parse bib_data if it's a JSON string
-        if 'bib_data' in parsed and isinstance(parsed['bib_data'], str):
-            logger.debug(f"Found bib_data string: {parsed['bib_data'][:100]}...")
-            try:
-                parsed['bib_data'] = json.loads(parsed['bib_data'])
-                logger.debug(f"Successfully parsed bib_data, now has keys: {list(parsed['bib_data'].keys())}")
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse bib_data JSON: {e}")
+            logger.debug(f"Parsing request with keys: {list(parsed.keys())}")
+            
+            # Parse bib_data if it's a JSON string
+            if 'bib_data' in parsed and isinstance(parsed['bib_data'], str):
+                logger.debug(f"Found bib_data string: {parsed['bib_data'][:100]}...")
+                try:
+                    parsed['bib_data'] = json.loads(parsed['bib_data'])
+                    logger.debug(f"Successfully parsed bib_data, now has keys: {list(parsed['bib_data'].keys())}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse bib_data JSON: {e}")
+                    parsed['bib_data'] = {}
+            elif 'bib_data' not in parsed:
+                logger.warning("No bib_data found in request")
                 parsed['bib_data'] = {}
-        elif 'bib_data' not in parsed:
-            logger.warning("No bib_data found in request")
-            parsed['bib_data'] = {}
-        else:
-            logger.debug(f"bib_data already parsed, type: {type(parsed['bib_data'])}, keys: {list(parsed['bib_data'].keys()) if isinstance(parsed['bib_data'], dict) else 'not a dict'}")
+            else:
+                logger.debug(f"bib_data already parsed, type: {type(parsed['bib_data'])}, keys: {list(parsed['bib_data'].keys()) if isinstance(parsed['bib_data'], dict) else 'not a dict'}")
             
             # Parse metrics if it's a JSON string
             if 'metrics' in parsed and isinstance(parsed['metrics'], str):

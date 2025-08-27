@@ -240,7 +240,7 @@ class TestAppFunctions:
         # Test edge case with minimal record
         logger.info("\nTesting edge case with minimal record:")
         astronomy_record = {
-            "classifications": {"database": ["astronomy"]}
+            "classifications": ["astronomy"]
         }
         weights = app.compute_collection_weights(astronomy_record)
         
@@ -249,9 +249,10 @@ class TestAppFunctions:
             assert isinstance(weights[field], (int, float)), f"Weight {field} should be numeric"
             assert 0 <= weights[field] <= 1, f"Weight {field} should be between 0 and 1"
         
-        # Astrophysics should have highest weight for astrophysics record
-        assert weights['astrophysics_weight'] >= weights['physics_weight']
-        logger.info("   Minimal astrophysics record - weights computed correctly")
+        # For an astronomy record (mapped to astrophysics), the weights represent how relevant each discipline is to astrophysics
+        # Based on COLLECTION_RANKINGS, astrophysics should have weight 1.0 (rank 1) and physics should have weight 0.64 (rank 3)
+        assert weights['astrophysics_weight'] == 1.0, f"Expected astrophysics_weight=1.0, got {weights['astrophysics_weight']}"
+        assert weights['physics_weight'] == 0.64, f"Expected physics_weight=0.64, got {weights['physics_weight']}"
     
     def test_compute_final_boost(self, app):
         """Test final boost computation using ALL test records"""
