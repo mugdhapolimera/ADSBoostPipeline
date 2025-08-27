@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, desc, or_, and_
 from sqlalchemy.orm import scoped_session, sessionmaker
 from adsputils import load_config, setup_logging
 from adsmsg import BoostResponseRecord
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import ParseDict, MessageToDict
 
 
 proj_home = os.path.realpath(os.path.join(os.path.dirname(__file__), "../"))
@@ -35,16 +35,22 @@ class ADSBoostCelery(ADSCelery):
         """
         Handles incoming message payload from Master Pipeline
         """
+        logger.debug(f"Message: {message}")
+        logger.debug(f"Payload: {payload}")
         try:
-            # Handle both JSON strings and already parsed dictionaries
-            if isinstance(message, str):
+            # Handle protobuf objects, JSON strings, and already parsed dictionaries
+            if hasattr(message, 'DESCRIPTOR'):  # This is a protobuf message
+                logger.debug("Received protobuf message, converting to dict")
+                parsed_message = self._protobuf_to_dict(message)
+            elif isinstance(message, str):
                 parsed_message = json.loads(message)
             elif isinstance(message, dict):
                 parsed_message = message
+                logger.debug(f"Parsed message: {parsed_message}")
             else:
-                raise ValueError(f"Message must be a string or dict, got {type(message)}")
+                raise ValueError(f"Message must be a protobuf object, string, or dict, got {type(message)}")
                 
-            logger.info("Processing record from Master Pipeline")
+            logger.debug("Processing record from Master Pipeline")
             self.process_boost_request(parsed_message)
                 
         except Exception as e:
@@ -91,16 +97,22 @@ class ADSBoostCelery(ADSCelery):
         """
         try:
             parsed = request.copy()
-            
-            # Parse bib_data if it's a JSON string
-            if 'bib_data' in parsed and isinstance(parsed['bib_data'], str):
-                try:
-                    parsed['bib_data'] = json.loads(parsed['bib_data'])
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse bib_data JSON: {e}")
-                    parsed['bib_data'] = {}
-            elif 'bib_data' not in parsed:
+                    logger.debug(f"Parsing request with keys: {list(parsed.keys())}")
+        
+        # Parse bib_data if it's a JSON string
+        if 'bib_data' in parsed and isinstance(parsed['bib_data'], str):
+            logger.debug(f"Found bib_data string: {parsed['bib_data'][:100]}...")
+            try:
+                parsed['bib_data'] = json.loads(parsed['bib_data'])
+                logger.debug(f"Successfully parsed bib_data, now has keys: {list(parsed['bib_data'].keys())}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse bib_data JSON: {e}")
                 parsed['bib_data'] = {}
+        elif 'bib_data' not in parsed:
+            logger.warning("No bib_data found in request")
+            parsed['bib_data'] = {}
+        else:
+            logger.debug(f"bib_data already parsed, type: {type(parsed['bib_data'])}, keys: {list(parsed['bib_data'].keys()) if isinstance(parsed['bib_data'], dict) else 'not a dict'}")
             
             # Parse metrics if it's a JSON string
             if 'metrics' in parsed and isinstance(parsed['metrics'], str):
@@ -134,29 +146,65 @@ class ADSBoostCelery(ADSCelery):
             elif 'collections' not in parsed:
                 parsed['collections'] = []
             
-            # Ensure required fields exist
-            if 'bibcode' not in parsed:
-                parsed['bibcode'] = ''
-            if 'scix_id' not in parsed:
-                parsed['scix_id'] = ''
-            if 'status' not in parsed:
-                parsed['status'] = 'unknown'
-            
-            logger.debug(f"Parsed message structure: {list(parsed.keys())}")
             return parsed
-            
         except Exception as e:
             logger.error(f"Error parsing master pipeline message: {e}")
-            # Return a safe default structure
-            return {
-                'bibcode': request.get('bibcode', ''),
-                'scix_id': request.get('scix_id', ''),
-                'status': 'error',
-                'bib_data': {},
-                'metrics': {},
-                'classifications': [],
-                'collections': []
-            }
+            raise
+
+    def _protobuf_to_dict(self, protobuf_message):
+        """
+        Convert a protobuf message to a dictionary
+        
+        :param protobuf_message: Protobuf message object
+        :return: Dictionary representation of the protobuf message
+        """
+        try:
+            # Convert protobuf to dict using MessageToDict
+            # Convert protobuf to dict
+            message_dict = MessageToDict(protobuf_message, preserving_proto_field_name=True)
+            
+            logger.debug(f"Protobuf message keys before decoding: {list(message_dict.keys())}")
+            logger.debug(f"Protobuf message content: {message_dict}")
+            
+            # Handle base64-encoded fields that need decoding
+            if 'bib_data' in message_dict and isinstance(message_dict['bib_data'], str):
+                try:
+                    import base64
+                    # Decode base64 string back to JSON
+                    decoded_bytes = base64.b64decode(message_dict['bib_data'])
+                    decoded_str = decoded_bytes.decode('utf-8')
+                    
+                    # Handle case where bib_data might be "None" or other invalid values
+                    if decoded_str.lower() in ['none', 'null', '']:
+                        message_dict['bib_data'] = {}
+                    else:
+                        message_dict['bib_data'] = json.loads(decoded_str)
+                except Exception as e:
+                    logger.warning(f"Failed to decode bib_data from base64: {e}")
+                    message_dict['bib_data'] = {}
+            
+            if 'metrics' in message_dict and isinstance(message_dict['metrics'], str):
+                try:
+                    import base64
+                    # Decode base64 string back to JSON
+                    decoded_bytes = base64.b64decode(message_dict['metrics'])
+                    decoded_str = decoded_bytes.decode('utf-8')
+                    
+                    # Handle case where metrics might be "None" or other invalid values
+                    if decoded_str.lower() in ['none', 'null', '']:
+                        message_dict['metrics'] = {}
+                    else:
+                        message_dict['metrics'] = json.loads(decoded_str)
+                except Exception as e:
+                    logger.warning(f"Failed to decode metrics from base64: {e}")
+                    message_dict['metrics'] = {}
+            
+            logger.debug(f"Successfully converted protobuf to dict: {list(message_dict.keys())}")
+            return message_dict
+            
+        except Exception as e:
+            logger.error(f"Error converting protobuf to dict: {e}")
+            raise
 
     def compute_refereed_boost(self, record):
         """
@@ -192,8 +240,12 @@ class ADSBoostCelery(ADSCelery):
         """
         # Check bib_data section for doctype
         doctype = ''
+        logger.debug(f"Record keys: {list(record.keys())}")
         if 'bib_data' in record:
+            logger.debug(f"bib_data type: {type(record['bib_data'])}")
+            logger.debug(f"bib_data content: {record['bib_data']}")
             doctype = record['bib_data'].get('doctype', '').lower()
+        logger.debug(f"Doctype: {doctype}")
         
         if self.config.get("DOCTYPE_RANKING", False):
             doctype_rank = self.config.get("DOCTYPE_RANKING")
@@ -340,28 +392,25 @@ class ADSBoostCelery(ADSCelery):
                 weight = 1.0 - (0.9 * i / (len(sorted_ranks) - 1))
                 rank_to_weight[rank] = weight
         
-        # For each discipline, find the maximum weight across all collections the record belongs to
+        # For each discipline, find the maximum weight for this discipline across all collections the record belongs to
         collection_weights = {}
         
-        # Special case: if record explicitly has 'general' collection, all disciplines get weight 1.0
-        if 'general' in record_collections:
-            for discipline in collections:
-                collection_weights[f'{discipline}_weight'] = 1.0
-            return collection_weights
-
         for discipline in collections:
             # Find the maximum weight for this discipline across all record collections
             max_weight = 0.0
             for record_collection in record_collections:
-                collection_table = collection_rankings.get(record_collection, {})
-                rank = collection_table.get(discipline)
+                # Look up how relevant this collection is TO the discipline
+                discipline_rankings = collection_rankings.get(discipline, {})
+                rank = discipline_rankings.get(record_collection)
                 if rank is not None:
                     weight = rank_to_weight.get(rank, 0.0)
                     max_weight = max(max_weight, weight)
             
             # Use discipline name directly as column name
             collection_weights[f'{discipline}_weight'] = max_weight
+            logger.debug(f"Discipline {discipline}: max_weight = {max_weight}")
         
+        logger.debug(f"Final collection weights: {collection_weights}")
         return collection_weights
 
     def compute_final_boost(self, record):
@@ -407,6 +456,7 @@ class ADSBoostCelery(ADSCelery):
         
         # Step 3: Compute collection weights
         collection_weights = self.compute_collection_weights(record)
+        logger.debug(f"Computed collection weights: {collection_weights}")
         
         # Step 4: Compute all discipline final boosts as discipline_weight * boost_factor
         collections = self.config.get('COLLECTIONS', ['astrophysics', 'physics', 'earthscience', \
@@ -542,13 +592,13 @@ class ADSBoostCelery(ADSCelery):
             }
             protobuf_format = BoostResponseRecord()
             response_message = ParseDict(message, protobuf_format)
-            logger.info(f"Response message: {response_message}")
-            logger.info(f"Response message type: {type(response_message)}")
+            logger.debug(f"Response message: {response_message}")
+            logger.debug(f"Response message type: {type(response_message)}")
 
             # Send to Master Pipeline
             self.forward_message(response_message)
             
-            logger.info(f"Sent boost factors to Master Pipeline for {bibcode}")
+            logger.debug(f"Sent boost factors to Master Pipeline for {bibcode}")
             
         except Exception as e:
             logger.error(f"Error sending to Master Pipeline: {e}")

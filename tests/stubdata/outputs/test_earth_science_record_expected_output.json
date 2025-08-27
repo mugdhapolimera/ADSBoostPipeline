@@ -3,22 +3,25 @@
     "bibcode": "2014CG.....66...40K",
     "scix_id": "scix:1A5S-QJMN-G29Z",
     "doctype": "article",
-    "classification": []
+    "classification": [
+      "earthscience",
+      "physics"
+    ]
   },
   "doctype_boost": 1.0,
   "refereed_boost": 1.0,
   "recency_boost": 1.0,
   "boost_factor": 1.0,
-  "astrophysics_weight": 0.64,
+  "astrophysics_weight": 0.8200000000000001,
   "physics_weight": 1.0,
   "earthscience_weight": 1.0,
-  "planetary_weight": 0.64,
-  "heliophysics_weight": 0.64,
-  "general_weight": 0.8200000000000001,
-  "astrophysics_final_boost": 0.64,
+  "planetary_weight": 0.8200000000000001,
+  "heliophysics_weight": 0.8200000000000001,
+  "general_weight": 1.0,
+  "astrophysics_final_boost": 0.8200000000000001,
   "physics_final_boost": 1.0,
   "earthscience_final_boost": 1.0,
-  "planetary_final_boost": 0.64,
-  "heliophysics_final_boost": 0.64,
-  "general_final_boost": 0.8200000000000001
+  "planetary_final_boost": 0.8200000000000001,
+  "heliophysics_final_boost": 0.8200000000000001,
+  "general_final_boost": 1.0
 }

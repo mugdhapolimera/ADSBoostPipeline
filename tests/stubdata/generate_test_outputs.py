@@ -36,7 +36,7 @@ def generate_output_for_input(input_file_path, output_dir):
             'bibcode': input_data.get('bibcode', 'N/A'),
             'scix_id': input_data.get('scix_id', 'N/A'),
             'doctype': input_data.get('bib_data', {}).get('doctype', 'N/A'),
-            'classification': []
+            'classification': input_data.get('classifications', [])
         }
         
         # Create output structure
