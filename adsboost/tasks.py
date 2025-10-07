@@ -37,7 +37,7 @@ def task_process_boost_request_message(message, pipeline='boost'):
     :param message: JSON string containing boost request message
     """
     try:
-        logger.info("Processing boost request message")
+        logger.debug("Processing boost request message")
         app.handle_message_payload(message=message)
         return "success"
     except Exception as e:
@@ -57,7 +57,7 @@ def task_compute_boost_factors(record_data):
     :return: Dictionary with computed boost factors including boost_factor and discipline final boosts
     """
     try:
-        logger.info(f"Computing boost factors for {record_data.get('bibcode', record_data.get('scix_id'))}")
+        logger.debug(f"Computing boost factors for {record_data.get('bibcode', record_data.get('scix_id'))}")
         boost_factors = app.compute_final_boost(record_data)
 
         # Extract bibcode and scix_id from record_data
@@ -81,7 +81,7 @@ def task_query_boost_factors(bibcode=None, scix_id=None):
     :return: List of boost factor records with new structure
     """
     try:
-        logger.info(f"Querying boost factors for {bibcode or scix_id}")
+        logger.debug(f"Querying boost factors for {bibcode or scix_id}")
         results = app.query_boost_factors(bibcode=bibcode, scix_id=scix_id)
         return results
     except Exception as e:
@@ -98,7 +98,7 @@ def task_export_boost_factors(output_path, bibcodes=None, scix_ids=None):
     :param scix_ids: List of scix_ids to export (optional)
     """
     try:
-        logger.info(f"Exporting boost factors to {output_path}")
+        logger.debug(f"Exporting boost factors to {output_path}")
         
         # Prepare output file
         app.prepare_output_file(output_path)
@@ -144,7 +144,7 @@ def task_export_boost_factors(output_path, bibcodes=None, scix_ids=None):
                     for result in results:
                         app.add_record_to_output_file(result, output_path)
         
-        logger.info(f"Successfully exported boost factors to {output_path}")
+        logger.debug(f"Successfully exported boost factors to {output_path}")
         return {"status": "success", "output_path": output_path}
         
     except Exception as e:
